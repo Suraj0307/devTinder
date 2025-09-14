@@ -5,8 +5,12 @@ const { validateSignUpData } = require("./utils/validation.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const  {userAuth} = require("./middlewares/auth.js");
+const cookieParser = require("cookie-parser");
+
 const app = express();
 
+app.use(cookieParser());
 app.use(express.json());
 
 // User signup route
@@ -32,7 +36,7 @@ app.post("/signup", async(req, res) => {
 
         await newUser.save();
 
-        const token = await jwt.sign({emailId: newUser.emailId }, process.env.JWT_SECRET);
+        const token = await newUser.getJWT();
         res.cookie("token", token, {
         httpOnly: true
         });
@@ -61,9 +65,16 @@ app.post("/login", async(req, res) => {
             return res.status(404).json({ message: "Invalid Credentials" });
         }
 
-        if (await bcrypt.compare(password, user.password)) {
+        if (await user.validatePassword(password)) {
             // Passwords match
-            res.status(200).json({ message: "Login successful", token });
+            
+            // creating token
+            const token = await user.getJWT();
+            res.cookie("token", token, {
+                httpOnly: true
+            });
+
+            res.status(200).json({ message: "Login successful" });
         } else {
             // Passwords do not match
             res.status(401).json({ message: "Invalid Credentials" });
@@ -76,20 +87,27 @@ app.post("/login", async(req, res) => {
 })
 
 // User feed route
-app.get("/feed", async(req, res) => {
+app.get("/feed", userAuth, async(req, res) => {
     try {
-        const { token } = req.cookies;
-
-        const decodedMessage = await jwt.verify(token, process.env.JWT_SECRET);
-
-        const { _id } = decodedMessage;
-        console.log("User ID from token:", _id);
-        
         const users = await User.find();
         res.status(200).json(users);
     } catch (error) {
         console.error("Error fetching users:", error);
         res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
+// Profile route
+app.get("/profile", userAuth, (req, res) => {
+    res.status(200).json(req.user);
+});
+
+// Sending connection request
+app.post("/sendConnectionRequest", userAuth, async (req, res) => {
+    try {
+        
+    } catch (error) {
+
     }
 });
 
